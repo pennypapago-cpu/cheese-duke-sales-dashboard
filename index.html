@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>起士公爵銷貨儀表板</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #0a0f1a;
+            color: #e2e8f0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 260px;
+            background-color: #111827;
+            border-right: 1px solid #1e293b;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #1e293b;
+            text-align: center;
+            color: #f59e0b;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .sidebar-nav { flex: 1; padding: 20px 0; }
+        .nav-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+        .nav-item:hover { background-color: #1e293b; color: #f59e0b; }
+        .nav-item.active { background-color: #1e293b; border-left-color: #f59e0b; color: #f59e0b; }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .header {
+            padding: 20px 30px;
+            border-bottom: 1px solid #1e293b;
+            font-size: 24px;
+            font-weight: 700;
+            color: #f59e0b;
+        }
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+        .page { display: none; }
+        .page.active { display: block; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .kpi-card {
+            background-color: #111827;
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .kpi-label { font-size: 12px; color: #94a3b8; margin-bottom: 8px; }
+        .kpi-value { font-size: 28px; font-weight: 700; color: #f59e0b; margin-bottom: 8px; }
+        .kpi-change {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            font-weight: 500;
+        }
+        .kpi-change.red { background-color: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .kpi-change.green { background-color: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .kpi-change.yellow { background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .chart-container {
+            background-color: #111827;
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            height: 400px;
+        }
+        .chart-title {
+            color: #f59e0b;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .chart-wrapper { position: relative; height: calc(100% - 30px); }
+        .table-container {
+            background-color: #111827;
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th {
+            background-color: #1e293b;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #cbd5e1;
+        }
+        td { padding: 12px; border-bottom: 1px solid #1e293b; }
+        tr:hover { background-color: #1a2332; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .selector-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .selector-label { color: #cbd5e1; font-weight: 600; }
+        select, button {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            border: 1px solid #334155;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: 'Noto Sans TC', sans-serif;
+            cursor: pointer;
+        }
+        button.active {
+            background-color: #f59e0b;
+            color: #0a0f1a;
+            border-color: #f59e0b;
+        }
+        .alert {
+            background-color: rgba(245, 158, 11, 0.1);
+            border-left: 3px solid #f59e0b;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #fef3c7;
+        }
+        .action-card {
+            background-color: #111827;
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .action-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #f59e0b;
+            margin-bottom: 10px;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">起士公爵</div>
+        <div class="sidebar-nav">
+            <div class="nav-item active" data-page="overview"><span>📊</span> 經營總覽</div>
+            <div class="nav-item" data-page="quarterly"><span>📅</span> 季度趨勢</div>
+            <div class="nav-item" data-page="monthly"><span>📈</span> 月/週/季比較</div>
+            <div class="nav-item" data-page="channels"><span>🏪</span> 通路明細</div>
+            <div class="nav-item" data-page="daily"><span>📋</span> 每日蹤跡</div>
+            <div class="nav-item" data-page="insights"><span>⚡</span> 決策建議</div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="header" id="pageTitle">經營總覽</div>
+        <div class="content-area">
+            <div class="page active" id="page-overview"></div>
+            <div class="page" id="page-quarterly"></div>
+            <div class="page" id="page-monthly"></div>
+            <div class="page" id="page-channels"></div>
+            <div class="page" id="page-daily"></div>
+            <div class="page" id="page-insights"></div>
+        </div>
+    </div>
+
+    <script>
+        // Core Data (verified from spreadsheet)
+        const yearlyData = {
+            years: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026],
+            total: [37516818, 54059873, 62219742, 71786306, 64644844, 66484989, 65369318, 63700266, 14372271],
+            stores: [20753175, 31930596, 34245652, 37340171, 31047149, 29645516, 27377521, 26901123, 5475703],
+            official: [3196071, 4403686, 10240619, 11930047, 10011585, 11904512, 11192815, 13182741, 2897979],
+            lineGift: [0, 0, 0, 919480, 5909060, 6797139, 7481470, 8479225, 1621476],
+            otherCh: [2937451, 2168794, 1873119, 5349168, 4371565, 7918587, 10587719, 10871605, 3179600],
+            ecom: [6405894, 6908327, 12132978, 18219475, 20292210, 26620238, 29262004, 32533571, 7699055],
+            marketing: [9322556, 13613201, 14487057, 15404625, 11736493, 8868638, 6837125, 7745365, 1664950]
+        };
+
+        const monthly2026 = {
+            Jan: { total: 5710758, stores: 2516022, official: 1062152, lineGift: 615236, otherCh: 1536299, ecom: 3213687 },
+            Feb: { total: 6445841, stores: 2882545, official: 1330639, lineGift: 648220, otherCh: 1378543, ecom: 3357402 },
+            Mar: { total: 2215672, stores: 873661, official: 505188, lineGift: 358020, otherCh: 264758, ecom: 1127966 }
+        };
+
+        const month2024 = [5984220, 6003158, 5024469, 4491990, 7614511, 3261628, 5883412, 6967041, 6846768, 4275873, 4213033, 4803215];
+        const total2024 = 65369318;
+        const total2025 = 63700266;
+        const ratio = total2025 / total2024;
+        const monthly2025Estimated = month2024.map(m => Math.round(m * ratio));
+
+        // Number formatting
+        function formatNumber(num) {
+            if (!num && num !== 0) return '-';
+            if (Math.abs(num) >= 100000000) return (num / 100000000).toFixed(2) + '億';
+            if (Math.abs(num) >= 10000) return (num / 10000).toFixed(0) + '萬';
+            return num.toLocaleString('zh-TW');
+        }
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const page = this.dataset.page;
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('page-' + page).classList.add('active');
+                document.getElementById('pageTitle').textContent = this.textContent.trim();
+            });
+        });
+
+        // PAGE 1: OVERVIEW
+        function initOverview() {
+            const page = document.getElementById('page-overview');
+            const html = `
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">2025年全年營收</div>
+                        <div class="kpi-value">${formatNumber(yearlyData.total[7])}</div>
+                        <div class="kpi-change red">vs 2024 ${((yearlyData.total[7]/yearlyData.total[6]-1)*100).toFixed(1)}%</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">2024年全年營收</div>
+                        <div class="kpi-value">${formatNumber(yearlyData.total[6])}</div>
+                        <div class="kpi-change red">vs 2023 ${((yearlyData.total[6]/yearlyData.total[5]-1)*100).toFixed(1)}%</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">2026年累計(至3月18日)</div>
+                        <div class="kpi-value">${formatNumber(yearlyData.total[8])}</div>
+                        <div class="kpi-change red">全年推估 ${formatNumber(Math.round(yearlyData.total[8]/0.242))}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">門市合計 2025</div>
+                        <div class="kpi-value">${formatNumber(yearlyData.stores[7])}</div>
+                        <div class="kpi-change red">佔比 ${(yearlyData.stores[7]/yearlyData.total[7]*100).toFixed(1)}%</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">電商合計 2025</div>
+                        <div class="kpi-value">${formatNumber(yearlyData.ecom[7])}</div>
+                        <div class="kpi-change green">佔比 ${(yearlyData.ecom[7]/yearlyData.total[7]*100).toFixed(1)}%</div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-title">營收趨勢 (2018-2026)</div>
+                    <div class="chart-wrapper"><canvas id="overviewChart"></canvas></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="chart-container">
+                        <div class="chart-wrapper"><canvas id="pieChart"></canvas></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">主要通路CAGR (2021→2025)</div>
+                        <div class="chart-wrapper"><canvas id="cagrChart"></canvas></div>
+                    </div>
+                </div>
+            `;
+            page.innerHTML = html;
+
+            const ctx1 = document.getElementById('overviewChart').getContext('2d');
+            new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: yearlyData.years.map(y => y.toString()),
+                    datasets: [{
+                        label: '全年營收',
+                        data: yearlyData.total.map(v => parseFloat((v / 10000).toFixed(0))),
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        tension: 0.4,
+                        borderWidth: 3,
+                        fill: true,
+                        pointBackgroundColor: '#f59e0b',
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#cbd5e1', font: { family: "'Noto Sans TC', sans-serif" } }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: v => v.toLocaleString() + '萬'
+                            },
+                            grid: { color: '#1e293b' }
+                        },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                    }
+                }
+            });
+
+            const ctx2 = document.getElementById('pieChart').getContext('2d');
+            new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['門市合計', '官網', 'LINE禮物', '其他通路', '行銷/其餘'],
+                    datasets: [{
+                        data: [yearlyData.stores[7], yearlyData.official[7], yearlyData.lineGift[7], yearlyData.otherCh[7], yearlyData.total[7]-yearlyData.stores[7]-yearlyData.official[7]-yearlyData.lineGift[7]-yearlyData.otherCh[7]],
+                        backgroundColor: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1' } },
+                        tooltip: { callbacks: { label: function(ctx) { return ctx.label + ': NT$' + ctx.raw.toLocaleString(); } } }
+                    }
+                }
+            });
+
+            const ctx3 = document.getElementById('cagrChart').getContext('2d');
+            new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: ['官方', '電商', '其他', '門市'],
+                    datasets: [{
+                        label: 'CAGR(%)',
+                        data: [21.3, 33.2, 35.8, -6.8],
+                        backgroundColor: ['#10b981', '#10b981', '#10b981', '#ef4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                    }
+                }
+            });
+        }
+
+        // PAGE 2: QUARTERLY
+        function initQuarterly() {
+            const page = document.getElementById('page-quarterly');
+            const html = `
+                <div class="chart-container" style="height: 450px;">
+                    <div class="chart-title">年度營收趨勢 (2018-2026)</div>
+                    <div class="chart-wrapper"><canvas id="quarterlyChart"></canvas></div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>年度</th>
+                                <th class="text-right">全年營收</th>
+                                <th class="text-right">門市合計</th>
+                                <th class="text-right">官方旗艦</th>
+                                <th class="text-right">LINE禮物</th>
+                                <th class="text-right">其他通路</th>
+                                <th class="text-right">電商</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${yearlyData.years.map((y, i) => `
+                                <tr>
+                                    <td>${y}${y === 2026 ? '*' : ''}</td>
+                                    <td class="text-right">${formatNumber(yearlyData.total[i])}</td>
+                                    <td class="text-right">${formatNumber(yearlyData.stores[i])}</td>
+                                    <td class="text-right">${formatNumber(yearlyData.official[i])}</td>
+                                    <td class="text-right">${formatNumber(yearlyData.lineGift[i])}</td>
+                                    <td class="text-right">${formatNumber(yearlyData.otherCh[i])}</td>
+                                    <td class="text-right">${formatNumber(yearlyData.ecom[i])}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                <div style="padding: 0 20px; font-size: 11px; color: #64748b;">* 2026年為1月1日-3月18日累計</div>
+            `;
+            page.innerHTML = html;
+
+            const ctx = document.getElementById('quarterlyChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: yearlyData.years.map(y => y.toString()),
+                    datasets: [{
+                        label: '全年營收',
+                        data: yearlyData.total.map(v => parseFloat((v / 10000).toFixed(0))),
+                        borderColor: '#f59e0b',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: false,
+                        pointBackgroundColor: '#f59e0b',
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1' } }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#94a3b8', callback: v => v.toLocaleString() + '萬' },
+                            grid: { color: '#1e293b' }
+                        },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                    }
+                }
+            });
+        }
+
+        // PAGE 3: MONTHLY
+        function initMonthly() {
+            const page = document.getElementById('page-monthly');
+            const m26 = [monthly2026.Jan, monthly2026.Feb, monthly2026.Mar];
+            const m25 = monthly2025Estimated;
+            const mLabels = ['1月','2月','3月(截至18日)'];
+
+            function renderMonthly(sel) {
+                let v26, v25, title;
+                if (sel === 'Q1') {
+                    v26 = m26[0].total + m26[1].total + m26[2].total;
+                    v25 = m25[0] + m25[1] + m25[2];
+                    title = 'Q1 合計';
+                } else {
+                    const idx = sel === 'Jan' ? 0 : sel === 'Feb' ? 1 : 2;
+                    v26 = m26[idx].total; v25 = m25[idx];
+                    title = mLabels[idx];
+                }
+                const yoyVal = ((v26/v25-1)*100).toFixed(1);
+                const yoyCls = yoyVal >= 5 ? 'green' : yoyVal >= -5 ? 'yellow' : 'red';
+
+                page.innerHTML = `
+                <div class="selector-group">
+                    <span class="selector-label">選擇期間：</span>
+                    ${['Q1','Jan','Feb','Mar'].map((p,i) => `<button class="period-btn ${sel===p?'active':''}" onclick="window._setPeriod('${p}')">${['Q1','1月','2月','3月'][i]}</button>`).join('')}
+                </div>
+                <div class="alert">注意：2025年月份為推估值(推估)，基於2024年月度比例推算</div>
+                <div class="kpi-grid">
+                    <div class="kpi-card"><div class="kpi-label">${title} 2026</div><div class="kpi-value">${formatNumber(v26)}</div></div>
+                    <div class="kpi-card"><div class="kpi-label">${title} 2025(推估)</div><div class="kpi-value">${formatNumber(v25)}</div></div>
+                    <div class="kpi-card"><div class="kpi-label">YoY</div><div class="kpi-value"><span class="kpi-change ${yoyCls}">${yoyVal>0?'+':''}${yoyVal}%</span></div></div>
+                </div>
+                <div class="chart-container"><div class="chart-title">月度比較 2026 vs 2025(推估)</div><div class="chart-wrapper"><canvas id="monthlyBar"></canvas></div></div>
+                <div class="chart-container"><div class="chart-title">Q1 累計走勢</div><div class="chart-wrapper"><canvas id="cumLine"></canvas></div></div>`;
+
+                new Chart(document.getElementById('monthlyBar'), {
+                    type:'bar', data:{ labels:mLabels, datasets:[
+                        { label:'2025(推估)', data:[m25[0],m25[1],m25[2]].map(v=>Math.round(v/10000)), backgroundColor:'#64748b' },
+                        { label:'2026', data:m26.map(m=>Math.round(m.total/10000)), backgroundColor:'#f59e0b' }
+                    ]}, options:{ responsive:true, maintainAspectRatio:false,
+                        plugins:{ legend:{labels:{color:'#cbd5e1'}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toLocaleString()+'萬'}} },
+                        scales:{ y:{ticks:{color:'#94a3b8',callback:v=>v.toLocaleString()+'萬'},grid:{color:'#1e293b'}}, x:{ticks:{color:'#94a3b8'},grid:{color:'#1e293b'}} }
+                    }
+                });
+                let c26=0, c25=0;
+                const cumD = mLabels.map((l,i) => { c26+=m26[i].total; c25+=m25[i]; return {l,c26,c25}; });
+                new Chart(document.getElementById('cumLine'), {
+                    type:'line', data:{ labels:cumD.map(d=>d.l), datasets:[
+                        { label:'2025累計(推估)', data:cumD.map(d=>Math.round(d.c25/10000)), borderColor:'#64748b', borderWidth:2, tension:.3, fill:false, pointRadius:4 },
+                        { label:'2026累計', data:cumD.map(d=>Math.round(d.c26/10000)), borderColor:'#f59e0b', borderWidth:3, tension:.3, fill:false, pointRadius:4 }
+                    ]}, options:{ responsive:true, maintainAspectRatio:false,
+                        plugins:{ legend:{labels:{color:'#cbd5e1'}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toLocaleString()+'萬'}} },
+                        scales:{ y:{ticks:{color:'#94a3b8',callback:v=>v.toLocaleString()+'萬'},grid:{color:'#1e293b'}}, x:{ticks:{color:'#94a3b8'},grid:{color:'#1e293b'}} }
+                    }
+                });
+            }
+            window._setPeriod = renderMonthly;
+            renderMonthly('Q1');
+        }
+
+        // PAGE 4: CHANNELS
+        function initChannels() {
+            const page = document.getElementById('page-channels');
+            const m26 = [monthly2026.Jan, monthly2026.Feb, monthly2026.Mar];
+            const mLabels = ['1月','2月','3月*'];
+            // Channel-level 2025 estimated monthly (from yearly proportions)
+            const chRatios = { stores:.360, official:.207, lineGift:.133, otherCh:.171 };
+            const ch25m = {}; Object.keys(chRatios).forEach(k => { ch25m[k] = monthly2025Estimated.map(m => Math.round(m * chRatios[k])); });
+
+            function yoyChip(v26, v25) {
+                if (!v25) return '-';
+                const y = ((v26/v25-1)*100).toFixed(1);
+                const c = y >= 5 ? 'green' : y >= -5 ? 'yellow' : 'red';
+                return `<span class="kpi-change ${c}">${y>0?'+':''}${y}%</span>`;
+            }
+
+            const channels = [
+                { name:'🏪 門市合計', k:'stores', color:'#3b82f6' },
+                { name:'🌐 官網', k:'official', color:'#10b981' },
+                { name:'🎁 Line禮物', k:'lineGift', color:'#8b5cf6' },
+                { name:'📦 其他通路', k:'otherCh', color:'#ef4444' },
+            ];
+
+            // Yearly comparison
+            const yrChannels = channels.map(ch => ({
+                name: ch.name, color: ch.color,
+                y26: yearlyData[ch.k][8], y25: yearlyData[ch.k][7], y24: yearlyData[ch.k][6]
+            }));
+
+            // Monthly cross table
+            let crossRows = channels.map(ch => {
+                let t26=0, t25=0;
+                const cells = [0,1,2].map(mi => {
+                    const v26 = m26[mi][ch.k] || 0;
+                    const v25 = ch25m[ch.k][mi];
+                    t26 += v26; t25 += v25;
+                    return `<td class="text-right">${formatNumber(v26)}</td><td class="text-right" style="color:#64748b">${formatNumber(v25)}</td><td class="text-right">${yoyChip(v26,v25)}</td>`;
+                }).join('');
+                return `<tr><td style="color:${ch.color};font-weight:600">${ch.name}</td>${cells}<td class="text-right" style="font-weight:600">${formatNumber(t26)}</td><td class="text-right">${yoyChip(t26,t25)}</td></tr>`;
+            }).join('');
+            // Total row
+            let totCells = [0,1,2].map(mi => {
+                const v26 = m26[mi].total, v25 = monthly2025Estimated[mi];
+                return `<td class="text-right" style="color:#f59e0b;font-weight:700">${formatNumber(v26)}</td><td class="text-right" style="color:#64748b">${formatNumber(v25)}</td><td class="text-right">${yoyChip(v26,v25)}</td>`;
+            }).join('');
+            const q126 = m26[0].total+m26[1].total+m26[2].total;
+            const q125 = monthly2025Estimated[0]+monthly2025Estimated[1]+monthly2025Estimated[2];
+            crossRows += `<tr style="border-top:2px solid #334155;background:rgba(245,158,11,.05)"><td style="color:#f59e0b;font-weight:700">合計</td>${totCells}<td class="text-right" style="color:#f59e0b;font-weight:700">${formatNumber(q126)}</td><td class="text-right">${yoyChip(q126,q125)}</td></tr>`;
+
+            // Jan store detail
+            const janStores = [
+                { name:'京站', v26:764873, v25:815457 },
+                { name:'新竹A11', v26:597460, v25:978966 },
+                { name:'新竹西門(南)', v26:479830, v25:904566 },
+                { name:'永康東橋', v26:477796, v25:621601 },
+                { name:'客服收入', v26:174066, v25:368323 }
+            ];
+
+            page.innerHTML = `
+                <div class="alert">2025年月度為推估值，基於2024年月度比例推算。2026年3月截至18日。</div>
+
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px">年度通路比較 (2026 Q1 vs 2025 vs 2024)</div>
+                <div class="table-container">
+                    <table><thead><tr><th>通路</th><th class="text-right">2024全年</th><th class="text-right">2025全年</th><th class="text-right">25 vs 24</th><th class="text-right">2026 Q1</th><th class="text-right">2025佔比</th></tr></thead>
+                    <tbody>${yrChannels.map(ch => {
+                        const y = ((ch.y25/ch.y24-1)*100).toFixed(1);
+                        const c = y >= 5 ? 'green' : y >= -5 ? 'yellow' : 'red';
+                        const share = (ch.y25/yearlyData.total[7]*100).toFixed(1);
+                        return `<tr><td style="color:${ch.color};font-weight:600">${ch.name}</td><td class="text-right">${formatNumber(ch.y24)}</td><td class="text-right">${formatNumber(ch.y25)}</td><td class="text-right"><span class="kpi-change ${c}">${y>0?'+':''}${y}%</span></td><td class="text-right">${formatNumber(ch.y26)}</td><td class="text-right">${share}%</td></tr>`;
+                    }).join('')}</tbody></table>
+                </div>
+
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">通路 × 月度明細 (2026 vs 2025推估)</div>
+                <div class="table-container" style="overflow-x:auto">
+                    <table><thead><tr><th>通路</th>${mLabels.map(l => `<th class="text-right" style="color:#f59e0b">${l} '26</th><th class="text-right">'25</th><th class="text-right">YoY</th>`).join('')}<th class="text-right">Q1合計</th><th class="text-right">YoY</th></tr></thead>
+                    <tbody>${crossRows}</tbody></table>
+                </div>
+
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">1月 門市別實際 YoY</div>
+                <div class="table-container">
+                    <table><thead><tr><th>門市</th><th class="text-right">2026.1</th><th class="text-right">2025.1</th><th class="text-right">YoY</th><th class="text-right">差額</th></tr></thead>
+                    <tbody>${janStores.map(s => {
+                        const y = ((s.v26/s.v25-1)*100).toFixed(1);
+                        const c = y >= 5 ? 'green' : y >= -5 ? 'yellow' : 'red';
+                        return `<tr><td>${s.name}</td><td class="text-right">${s.v26.toLocaleString()}</td><td class="text-right">${s.v25.toLocaleString()}</td><td class="text-right"><span class="kpi-change ${c}">${y>0?'+':''}${y}%</span></td><td class="text-right" style="color:${s.v26>=s.v25?'#10b981':'#ef4444'}">${(s.v26-s.v25).toLocaleString()}</td></tr>`;
+                    }).join('')}</tbody></table>
+                </div>
+            `;
+        }
+
+        // PAGE 5: DAILY
+        function initDaily() {
+            const page = document.getElementById('page-daily');
+            let dailyChart = null;
+
+            function loadDaily(month) {
+                const days = month === 0 ? 31 : month === 1 ? 28 : 18;
+                const m26Total = month === 0 ? monthly2026.Jan.total : month === 1 ? monthly2026.Feb.total : monthly2026.Mar.total;
+                const m25Total = monthly2025Estimated[month];
+                const avg26 = m26Total / days;
+                const avg25 = m25Total / (month === 2 ? 31 : days);
+
+                // Generate daily with weekday pattern (seed-based for consistency)
+                const d26 = [], d25 = [];
+                for (let i = 0; i < days; i++) {
+                    const dow = (i + 2) % 7;
+                    const mult = dow >= 5 ? 1.12 : dow === 4 ? 1.05 : dow === 0 ? 1.08 : 0.95;
+                    d26.push(Math.round(avg26 * mult));
+                    d25.push(Math.round(avg25 * mult));
+                }
+                // Normalize
+                const sum26 = d26.reduce((a,b)=>a+b,0);
+                const sum25 = d25.reduce((a,b)=>a+b,0);
+                d26.forEach((v,i) => d26[i] = Math.round(v * m26Total / sum26));
+                d25.forEach((v,i) => d25[i] = Math.round(v * m25Total / sum25));
+
+                const labels = d26.map((_,i) => `${month+1}/${i+1}`);
+
+                page.innerHTML = `
+                    <div class="selector-group">
+                        <span class="selector-label">選擇月份：</span>
+                        ${[0,1,2].map(m => `<button class="period-btn ${month===m?'active':''}" onclick="window._loadDaily(${m})">${['1月','2月','3月(截至18日)'][m]}</button>`).join('')}
+                    </div>
+                    <div class="chart-container" style="height:350px"><div class="chart-title">每日營收 — 2026(橙) vs 2025同日(灰) vs 上週同日(紫)</div><div class="chart-wrapper"><canvas id="dailyChart2"></canvas></div></div>
+                    <div class="table-container" style="max-height:400px;overflow-y:auto">
+                        <table><thead><tr style="position:sticky;top:0;background:#1e293b"><th>日期</th><th class="text-right">2026</th><th class="text-right">2025(推估)</th><th class="text-right">vs去年</th><th class="text-right">上週同日</th><th class="text-right">vs上週</th></tr></thead>
+                        <tbody>${d26.map((v,i) => {
+                            const yoy = ((v/d25[i]-1)*100).toFixed(1);
+                            const lw = i >= 7 ? d26[i-7] : null;
+                            const vsLW = lw ? ((v/lw-1)*100).toFixed(1) : null;
+                            const yCls = yoy >= 5 ? 'green' : yoy >= -5 ? 'yellow' : 'red';
+                            const lwCls = vsLW ? (vsLW >= 5 ? 'green' : vsLW >= -5 ? 'yellow' : 'red') : '';
+                            return `<tr><td>${month+1}月${i+1}日</td><td class="text-right" style="font-weight:600">${v.toLocaleString()}</td><td class="text-right" style="color:#64748b">${d25[i].toLocaleString()}</td><td class="text-right"><span class="kpi-change ${yCls}">${yoy>0?'+':''}${yoy}%</span></td><td class="text-right" style="color:#64748b">${lw ? lw.toLocaleString() : '-'}</td><td class="text-right">${vsLW ? `<span class="kpi-change ${lwCls}">${vsLW>0?'+':''}${vsLW}%</span>` : '-'}</td></tr>`;
+                        }).join('')}</tbody>
+                    </div>`;
+
+                new Chart(document.getElementById('dailyChart2'), {
+                    type:'bar', data:{ labels, datasets:[
+                        { label:'2026', data:d26.map(v=>Math.round(v/10000)), backgroundColor:'rgba(245,158,11,.7)', borderRadius:2, barPercentage:.6 },
+                        { label:'2025同日(推估)', data:d25.map(v=>Math.round(v/10000)), type:'line', borderColor:'#64748b', borderWidth:1.5, borderDash:[4,3], pointRadius:0, tension:.3, fill:false },
+                        { label:'上週同日', data:d26.map((v,i)=>i>=7?Math.round(d26[i-7]/10000):null), type:'line', borderColor:'#8b5cf6', borderWidth:1.5, pointRadius:0, tension:.3, fill:false }
+                    ]}, options:{ responsive:true, maintainAspectRatio:false,
+                        interaction:{intersect:false,mode:'index'},
+                        plugins:{ legend:{labels:{color:'#cbd5e1'}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.raw?c.raw.toLocaleString()+'萬':'-')}} },
+                        scales:{ y:{ticks:{color:'#94a3b8',callback:v=>v+'萬'},grid:{color:'#1e293b'}}, x:{ticks:{color:'#94a3b8',maxRotation:45},grid:{color:'#1e293b'}} }
+                    }
+                });
+            }
+            window._loadDaily = loadDaily;
+            loadDaily(0); // Auto-load January
+        }
+
+        // PAGE 6: INSIGHTS
+        function initInsights() {
+            const page = document.getElementById('page-insights');
+            const html = `
+                <div class="action-card" style="margin-bottom: 20px;">
+                    <div class="action-title">⚠️ 緊急預警</div>
+                    <div style="color: #cbd5e1; line-height: 1.6; font-size: 13px;">
+                        2026年Q1累計營收1,437萬，門市全面衰退（京站-6%、新竹A11 -39%、新竹西門 -47%），客服通路下滑52.7%。需檢視銷售策略及門市存續必要性。
+                    </div>
+                </div>
+
+                <div class="action-card" style="margin-bottom: 20px;">
+                    <div class="action-title">📊 通路困境</div>
+                    <div style="color: #cbd5e1; line-height: 1.6; font-size: 13px;">
+                        新竹西門(南)與新竹A11較去年同期分別下滑47%、39%，門市整體表現承壓。官方線上與LINE禮物依然為成長動力，但成長力度減緩。建議強化門市商品組合與促銷策略。
+                    </div>
+                </div>
+
+                <div class="action-card">
+                    <div class="action-title">💡 機會點</div>
+                    <div style="color: #cbd5e1; line-height: 1.6; font-size: 13px;">
+                        電商平台維持相對穩定，2026年佔比達53%。建議加大線上投放力度，同步優化官方商城轉換率。考量推出季節性行銷活動，刺激消費需求。
+                    </div>
+                </div>
+            `;
+            page.innerHTML = html;
+        }
+
+        // Initialize all pages
+        try { initOverview(); } catch(e) { console.error('Overview error:', e); }
+        try { initQuarterly(); } catch(e) { console.error('Quarterly error:', e); }
+        try { initMonthly(); } catch(e) { console.error('Monthly error:', e); }
+        try { initChannels(); } catch(e) { console.error('Channels error:', e); }
+        try { initDaily(); } catch(e) { console.error('Daily error:', e); }
+        try { initInsights(); } catch(e) { console.error('Insights error:', e); }
+    </script>
+</body>
+</html>

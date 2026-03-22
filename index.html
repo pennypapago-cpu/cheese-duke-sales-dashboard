@@ -532,7 +532,8 @@
         function initChannels() {
             const page = document.getElementById('page-channels');
             const m26 = [monthly2026.Jan, monthly2026.Feb, monthly2026.Mar];
-            const mLabels = ['1月','2月','3月*'];
+            const mTarget = [monthlyTarget2026.Jan, monthlyTarget2026.Feb, monthlyTarget2026.Mar];
+            const mLabels = ['1æ','2æ','3æ*'];
             // Channel-level 2025 estimated monthly (from yearly proportions)
             const chRatios = { stores:.360, official:.207, lineGift:.133, otherCh:.171 };
             const ch25m = {}; Object.keys(chRatios).forEach(k => { ch25m[k] = monthly2025Estimated.map(m => Math.round(m * chRatios[k])); });
@@ -543,13 +544,31 @@
                 const c = y >= 5 ? 'green' : y >= -5 ? 'yellow' : 'red';
                 return `<span class="kpi-change ${c}">${y>0?'+':''}${y}%</span>`;
             }
+            function achieveChip(actual, target) {
+                if (!target) return '<span style="color:#64748b">-</span>';
+                const pct = ((actual/target)*100).toFixed(1);
+                const c = pct >= 100 ? 'green' : pct >= 80 ? 'yellow' : 'red';
+                return `<span class="kpi-change ${c}">${pct}%</span>`;
+            }
 
+            // Channel definitions with target mapping
+            // Budget: ç´ç/åå ´âstores, å®ç¶²âofficial, éè·¯âchannels
             const channels = [
-                { name:'🏪 門市合計', k:'stores', color:'#3b82f6' },
-                { name:'🌐 官網', k:'official', color:'#10b981' },
-                { name:'🎁 Line禮物', k:'lineGift', color:'#8b5cf6' },
-                { name:'📦 其他通路', k:'otherCh', color:'#ef4444' },
+                { name:'ðª éå¸åè¨', k:'stores', targetK:'stores', color:'#3b82f6' },
+                { name:'ð å®ç¶²', k:'official', targetK:'official', color:'#10b981' },
+                { name:'ð Lineç¦®ç©', k:'lineGift', targetK:null, color:'#8b5cf6' },
+                { name:'ð¦ å¶ä»éè·¯', k:'otherCh', targetK:'channels', color:'#ef4444' },
             ];
+
+            // Q1 target achievement totals
+            const q1A = { total:0, stores:0, official:0, lineGift:0, otherCh:0 };
+            const q1T = { total:0, stores:0, official:0, channels:0 };
+            [0,1,2].forEach(i => {
+                q1A.total += m26[i].total; q1A.stores += m26[i].stores;
+                q1A.official += m26[i].official; q1A.lineGift += m26[i].lineGift; q1A.otherCh += m26[i].otherCh;
+                q1T.total += mTarget[i].total; q1T.stores += mTarget[i].stores;
+                q1T.official += mTarget[i].official; q1T.channels += mTarget[i].channels;
+            });
 
             // Yearly comparison
             const yrChannels = channels.map(ch => ({
@@ -557,41 +576,65 @@
                 y26: yearlyData[ch.k][8], y25: yearlyData[ch.k][7], y24: yearlyData[ch.k][6]
             }));
 
-            // Monthly cross table
+            // Monthly cross table with targets
             let crossRows = channels.map(ch => {
-                let t26=0, t25=0;
+                let t26=0, t25=0, tTarget=0;
                 const cells = [0,1,2].map(mi => {
                     const v26 = m26[mi][ch.k] || 0;
                     const v25 = ch25m[ch.k][mi];
-                    t26 += v26; t25 += v25;
-                    return `<td class="text-right">${formatNumber(v26)}</td><td class="text-right" style="color:#64748b">${formatNumber(v25)}</td><td class="text-right">${yoyChip(v26,v25)}</td>`;
+                    const vT = ch.targetK ? (mTarget[mi][ch.targetK] || 0) : 0;
+                    t26 += v26; t25 += v25; tTarget += vT;
+                    return `<td class="text-right">${formatNumber(v26)}</td><td class="text-right" style="color:#3b82f6">${ch.targetK ? formatNumber(vT) : '-'}</td><td class="text-right">${achieveChip(v26, ch.targetK ? vT : 0)}</td><td class="text-right" style="color:#64748b">${formatNumber(v25)}</td><td class="text-right">${yoyChip(v26,v25)}</td>`;
                 }).join('');
-                return `<tr><td style="color:${ch.color};font-weight:600">${ch.name}</td>${cells}<td class="text-right" style="font-weight:600">${formatNumber(t26)}</td><td class="text-right">${yoyChip(t26,t25)}</td></tr>`;
+                return `<tr><td style="color:${ch.color};font-weight:600">${ch.name}</td>${cells}<td class="text-right" style="font-weight:600">${formatNumber(t26)}</td><td class="text-right" style="color:#3b82f6">${ch.targetK ? formatNumber(tTarget) : '-'}</td><td class="text-right">${achieveChip(t26, ch.targetK ? tTarget : 0)}</td></tr>`;
             }).join('');
             // Total row
             let totCells = [0,1,2].map(mi => {
-                const v26 = m26[mi].total, v25 = monthly2025Estimated[mi];
-                return `<td class="text-right" style="color:#f59e0b;font-weight:700">${formatNumber(v26)}</td><td class="text-right" style="color:#64748b">${formatNumber(v25)}</td><td class="text-right">${yoyChip(v26,v25)}</td>`;
+                const v26 = m26[mi].total, v25 = monthly2025Estimated[mi], vT = mTarget[mi].total;
+                return `<td class="text-right" style="color:#f59e0b;font-weight:700">${formatNumber(v26)}</td><td class="text-right" style="color:#3b82f6;font-weight:700">${formatNumber(vT)}</td><td class="text-right">${achieveChip(v26,vT)}</td><td class="text-right" style="color:#64748b">${formatNumber(v25)}</td><td class="text-right">${yoyChip(v26,v25)}</td>`;
             }).join('');
-            const q126 = m26[0].total+m26[1].total+m26[2].total;
+            const q126 = q1A.total;
             const q125 = monthly2025Estimated[0]+monthly2025Estimated[1]+monthly2025Estimated[2];
-            crossRows += `<tr style="border-top:2px solid #334155;background:rgba(245,158,11,.05)"><td style="color:#f59e0b;font-weight:700">合計</td>${totCells}<td class="text-right" style="color:#f59e0b;font-weight:700">${formatNumber(q126)}</td><td class="text-right">${yoyChip(q126,q125)}</td></tr>`;
+            crossRows += `<tr style="border-top:2px solid #334155;background:rgba(245,158,11,.05)"><td style="color:#f59e0b;font-weight:700">åè¨</td>${totCells}<td class="text-right" style="color:#f59e0b;font-weight:700">${formatNumber(q126)}</td><td class="text-right" style="color:#3b82f6;font-weight:700">${formatNumber(q1T.total)}</td><td class="text-right">${achieveChip(q126,q1T.total)}</td></tr>`;
 
             // Jan store detail
             const janStores = [
-                { name:'京站', v26:764873, v25:815457 },
-                { name:'新竹A11', v26:597460, v25:978966 },
-                { name:'新竹西門(南)', v26:479830, v25:904566 },
-                { name:'永康東橋', v26:477796, v25:621601 },
-                { name:'客服收入', v26:174066, v25:368323 }
+                { name:'äº¬ç«', v26:764873, v25:815457 },
+                { name:'æ°ç«¹A11', v26:597460, v25:978966 },
+                { name:'æ°ç«¹è¥¿é(å)', v26:479830, v25:904566 },
+                { name:'æ°¸åº·æ±æ©', v26:477796, v25:621601 },
+                { name:'å®¢ææ¶å¥', v26:174066, v25:368323 }
             ];
 
-            page.innerHTML = `
-                <div class="alert">2025年月度為推估值，基於2024年月度比例推算。2026年3月截至18日。</div>
+            // Target achievement KPIs
+            const achTotal = ((q1A.total/q1T.total)*100).toFixed(1);
+            const achStores = ((q1A.stores/q1T.stores)*100).toFixed(1);
+            const achOfficial = ((q1A.official/q1T.official)*100).toFixed(1);
+            const achChannels = (((q1A.lineGift+q1A.otherCh)/q1T.channels)*100).toFixed(1);
+            function achCls(v) { return v >= 100 ? 'green' : v >= 80 ? 'yellow' : 'red'; }
 
-                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px">年度通路比較 (2026 Q1 vs 2025 vs 2024)</div>
+            page.innerHTML = `
+                <div class="alert">ç®æ¨ä¾èª115å¹´åº¦é ç®è¡¨ãé ç®åé¡ï¼ç´ç/åå ´âéå¸ãé»å(å®ç¶²+å®¢æ)âå®ç¶²ãéè·¯(ç·ä¸+å¨³¼+ç·ä¸)âLINEç¦®ç©+å¶ä»éè·¯ã2026å¹´3ææªè³18æ¥ã</div>
+
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px">Q1 éè·¯ç®æ¨éæç</div>
+                <div class="kpi-grid">
+                    <div class="kpi-card" style="border-color:#f59e0b"><div class="kpi-label">Q1 åè¨éæç</div><div class="kpi-value"><span class="kpi-change ${achCls(achTotal)}">${achTotal}%</span></div><div style="font-size:11px;color:#64748b">å¯¦é ${formatNumber(q1A.total)} / ç®æ¨ ${formatNumber(q1T.total)}</div></div>
+                    <div class="kpi-card" style="border-color:#3b82f6"><div class="kpi-label">ðª éå¸éæç</div><div class="kpi-value"><span class="kpi-change ${achCls(achStores)}">${achStores}%</span></div><div style="font-size:11px;color:#64748b">å¯¦é ${formatNumber(q1A.stores)} / ç®æ¨ ${formatNumber(q1T.stores)}</div></div>
+                    <div class="kpi-card" style="border-color:#10b981"><div class="kpi-label">ð å®ç¶²éæç</div><div class="kpi-value"><span class="kpi-change ${achCls(achOfficial)}">${achOfficial}%</span></div><div style="font-size:11px;color:#64748b">å¯¦é ${formatNumber(q1A.official)} / ç®æ¨ ${formatNumber(q1T.official)}</div></div>
+                    <div class="kpi-card" style="border-color:#ef4444"><div class="kpi-label">ð¦ éè·¯éæç</div><div class="kpi-value"><span class="kpi-change ${achCls(achChannels)}">${achChannels}%</span></div><div style="font-size:11px;color:#64748b">å¯¦é ${formatNumber(q1A.lineGift+q1A.otherCh)} / ç®æ¨ ${formatNumber(q1T.channels)}</div></div>
+                </div>
+
+                <div class="chart-container"><div class="chart-title">éè·¯ç®æ¨ vs å¯¦é (Q1æåº¦)</div><div class="chart-wrapper"><canvas id="chTargetBar"></canvas></div></div>
+
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">éè·¯ Ã æåº¦æç´°ï¼å«ç®æ¨ï¼</div>
+                <div class="table-container" style="overflow-x:auto">
+                    <table><thead><tr><th>éè·¯</th>${mLabels.map(l => `<th class="text-right" style="color:#f59e0b">${l}å¯¦é</th><th class="text-right" style="color:#3b82f6">ç®æ¨</th><th class="text-right">éæ</th><th class="text-right" style="color:#64748b">'25</th><th class="text-right">YoY</th>`).join('')}<th class="text-right">Q1å¯¦é</th><th class="text-right" style="color:#3b82f6">Q1ç®æ¨</th><th class="text-right">éæ</th></tr></thead>
+                    <tbody>${crossRows}</tbody></table>
+                </div>
+
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">å¹´åº¦éè·¯æ¯è¼ (2026 Q1 vs 2025 vs 2024)</div>
                 <div class="table-container">
-                    <table><thead><tr><th>通路</th><th class="text-right">2024全年</th><th class="text-right">2025全年</th><th class="text-right">25 vs 24</th><th class="text-right">2026 Q1</th><th class="text-right">2025佔比</th></tr></thead>
+                    <table><thead><tr><th>éè·¯</th><th class="text-right">2024å¨å¹´</th><th class="text-right">2025å¨å¹´</th><th class="text-right">25 vs 24</th><th class="text-right">2026 Q1</th><th class="text-right">2025ä½æ¯</th></tr></thead>
                     <tbody>${yrChannels.map(ch => {
                         const y = ((ch.y25/ch.y24-1)*100).toFixed(1);
                         const c = y >= 5 ? 'green' : y >= -5 ? 'yellow' : 'red';
@@ -600,15 +643,9 @@
                     }).join('')}</tbody></table>
                 </div>
 
-                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">通路 × 月度明細 (2026 vs 2025推估)</div>
-                <div class="table-container" style="overflow-x:auto">
-                    <table><thead><tr><th>通路</th>${mLabels.map(l => `<th class="text-right" style="color:#f59e0b">${l} '26</th><th class="text-right">'25</th><th class="text-right">YoY</th>`).join('')}<th class="text-right">Q1合計</th><th class="text-right">YoY</th></tr></thead>
-                    <tbody>${crossRows}</tbody></table>
-                </div>
-
-                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">1月 門市別實際 YoY</div>
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">1æ éå¸å¥å¯¦é YoY</div>
                 <div class="table-container">
-                    <table><thead><tr><th>門市</th><th class="text-right">2026.1</th><th class="text-right">2025.1</th><th class="text-right">YoY</th><th class="text-right">差額</th></tr></thead>
+                    <table><thead><tr><th>éå¸</th><th class="text-right">2026.1</th><th class="text-right">2025.1</th><th class="text-right">YoY</th><th class="text-right">å·®é¡</th></tr></thead>
                     <tbody>${janStores.map(s => {
                         const y = ((s.v26/s.v25-1)*100).toFixed(1);
                         const c = y >= 5 ? 'green' : y >= -5 ? 'yellow' : 'red';
@@ -616,6 +653,20 @@
                     }).join('')}</tbody></table>
                 </div>
             `;
+
+            // Target vs Actual bar chart by channel
+            const chBarLabels = ['éå¸','å®ç¶²','éè·¯(LINE+å¶ä»)','åè¨'];
+            const chBarTarget = [q1T.stores, q1T.official, q1T.channels, q1T.total].map(v=>Math.round(v/10000));
+            const chBarActual = [q1A.stores, q1A.official, q1A.lineGift+q1A.otherCh, q1A.total].map(v=>Math.round(v/10000));
+            new Chart(document.getElementById('chTargetBar'), {
+                type:'bar', data:{ labels:chBarLabels, datasets:[
+                    { label:'Q1 ç®æ¨', data:chBarTarget, backgroundColor:'rgba(59,130,246,0.5)', borderColor:'#3b82f6', borderWidth:2 },
+                    { label:'Q1 å¯¦é', data:chBarActual, backgroundColor:'rgba(245,158,11,0.7)', borderColor:'#f59e0b', borderWidth:1 }
+                ]}, options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y',
+                    plugins:{ legend:{labels:{color:'#cbd5e1'}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toLocaleString()+'è¬'}} },
+                    scales:{ x:{ticks:{color:'#94a3b8',callback:v=>v.toLocaleString()+'è¬'},grid:{color:'#1e293b'}}, y:{ticks:{color:'#94a3b8'},grid:{color:'#1e293b'}} }
+                }
+            });
         }
 
         // PAGE 5: DAILY

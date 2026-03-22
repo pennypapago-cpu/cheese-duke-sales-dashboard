@@ -220,6 +220,16 @@
             Mar: { total: 2215672, stores: 873661, official: 505188, lineGift: 358020, otherCh: 264758, ecom: 1127966 }
         };
 
+        // 115年度預算目標 (from Google Sheet 銷貨金額預估)
+        const monthlyTarget2026 = {
+            Jan: { total: 5562216, stores: 2400000, ecom: 1432370, official: 962690, channels: 1729846 },
+            Feb: { total: 6475479, stores: 3350000, ecom: 1170770, official: 951730, channels: 1954709 },
+            Mar: { total: 4685008, stores: 2430000, ecom: 1060634, official: 843250, channels: 1194374 },
+            Apr: { total: 5536075 }, May: { total: 9779146 }, Jun: { total: 4680604 },
+            Jul: { total: 5724404 }, Aug: { total: 9268142 }, Sep: { total: 6493790 },
+            Oct: { total: 4841878 }, Nov: { total: 4919508 }, Dec: { total: 5400000 }
+        };
+
         const month2024 = [5984220, 6003158, 5024469, 4491990, 7614511, 3261628, 5883412, 6967041, 6846768, 4275873, 4213033, 4803215];
         const total2024 = 65369318;
         const total2025 = 63700266;
@@ -455,51 +465,59 @@
             const page = document.getElementById('page-monthly');
             const m26 = [monthly2026.Jan, monthly2026.Feb, monthly2026.Mar];
             const m25 = monthly2025Estimated;
+            const mTarget = [monthlyTarget2026.Jan, monthlyTarget2026.Feb, monthlyTarget2026.Mar];
             const mLabels = ['1月','2月','3月(截至18日)'];
 
             function renderMonthly(sel) {
-                let v26, v25, title;
+                let v26, v25, vTarget, title;
                 if (sel === 'Q1') {
                     v26 = m26[0].total + m26[1].total + m26[2].total;
                     v25 = m25[0] + m25[1] + m25[2];
+                    vTarget = mTarget[0].total + mTarget[1].total + mTarget[2].total;
                     title = 'Q1 合計';
                 } else {
                     const idx = sel === 'Jan' ? 0 : sel === 'Feb' ? 1 : 2;
-                    v26 = m26[idx].total; v25 = m25[idx];
+                    v26 = m26[idx].total; v25 = m25[idx]; vTarget = mTarget[idx].total;
                     title = mLabels[idx];
                 }
                 const yoyVal = ((v26/v25-1)*100).toFixed(1);
                 const yoyCls = yoyVal >= 5 ? 'green' : yoyVal >= -5 ? 'yellow' : 'red';
+                const achieveVal = ((v26/vTarget)*100).toFixed(1);
+                const achieveCls = achieveVal >= 100 ? 'green' : achieveVal >= 80 ? 'yellow' : 'red';
 
                 page.innerHTML = `
                 <div class="selector-group">
                     <span class="selector-label">選擇期間：</span>
                     ${['Q1','Jan','Feb','Mar'].map((p,i) => `<button class="period-btn ${sel===p?'active':''}" onclick="window._setPeriod('${p}')">${['Q1','1月','2月','3月'][i]}</button>`).join('')}
                 </div>
-                <div class="alert">注意：2025年月份為推估值(推估)，基於2024年月度比例推算</div>
+                <div class="alert">注意：2025年月份為推估值(推估)，基於2024年月度比例推算。目標來自115年度預算表。</div>
                 <div class="kpi-grid">
-                    <div class="kpi-card"><div class="kpi-label">${title} 2026</div><div class="kpi-value">${formatNumber(v26)}</div></div>
+                    <div class="kpi-card"><div class="kpi-label">${title} 2026 實際</div><div class="kpi-value">${formatNumber(v26)}</div></div>
+                    <div class="kpi-card" style="border-color:#3b82f6"><div class="kpi-label">${title} 2026 目標</div><div class="kpi-value" style="color:#3b82f6">${formatNumber(vTarget)}</div></div>
+                    <div class="kpi-card"><div class="kpi-label">目標達成率</div><div class="kpi-value"><span class="kpi-change ${achieveCls}">${achieveVal}%</span></div></div>
                     <div class="kpi-card"><div class="kpi-label">${title} 2025(推估)</div><div class="kpi-value">${formatNumber(v25)}</div></div>
-                    <div class="kpi-card"><div class="kpi-label">YoY</div><div class="kpi-value"><span class="kpi-change ${yoyCls}">${yoyVal>0?'+':''}${yoyVal}%</span></div></div>
+                    <div class="kpi-card"><div class="kpi-label">YoY 年增率</div><div class="kpi-value"><span class="kpi-change ${yoyCls}">${yoyVal>0?'+':''}${yoyVal}%</span></div></div>
                 </div>
-                <div class="chart-container"><div class="chart-title">月度比較 2026 vs 2025(推估)</div><div class="chart-wrapper"><canvas id="monthlyBar"></canvas></div></div>
-                <div class="chart-container"><div class="chart-title">Q1 累計走勢</div><div class="chart-wrapper"><canvas id="cumLine"></canvas></div></div>`;
+                <div class="chart-container"><div class="chart-title">月度比較：實際 vs 目標 vs 2025(推估)</div><div class="chart-wrapper"><canvas id="monthlyBar"></canvas></div></div>
+                <div class="chart-container"><div class="chart-title">Q1 累計走勢（含目標）</div><div class="chart-wrapper"><canvas id="cumLine"></canvas></div></div>`;
 
                 new Chart(document.getElementById('monthlyBar'), {
                     type:'bar', data:{ labels:mLabels, datasets:[
                         { label:'2025(推估)', data:[m25[0],m25[1],m25[2]].map(v=>Math.round(v/10000)), backgroundColor:'#64748b' },
-                        { label:'2026', data:m26.map(m=>Math.round(m.total/10000)), backgroundColor:'#f59e0b' }
+                        { label:'2026 目標', data:mTarget.map(m=>Math.round(m.total/10000)), backgroundColor:'rgba(59,130,246,0.6)', borderColor:'#3b82f6', borderWidth:2 },
+                        { label:'2026 實際', data:m26.map(m=>Math.round(m.total/10000)), backgroundColor:'#f59e0b' }
                     ]}, options:{ responsive:true, maintainAspectRatio:false,
                         plugins:{ legend:{labels:{color:'#cbd5e1'}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toLocaleString()+'萬'}} },
                         scales:{ y:{ticks:{color:'#94a3b8',callback:v=>v.toLocaleString()+'萬'},grid:{color:'#1e293b'}}, x:{ticks:{color:'#94a3b8'},grid:{color:'#1e293b'}} }
                     }
                 });
-                let c26=0, c25=0;
-                const cumD = mLabels.map((l,i) => { c26+=m26[i].total; c25+=m25[i]; return {l,c26,c25}; });
+                let c26=0, c25=0, cTarget=0;
+                const cumD = mLabels.map((l,i) => { c26+=m26[i].total; c25+=m25[i]; cTarget+=mTarget[i].total; return {l,c26,c25,cTarget}; });
                 new Chart(document.getElementById('cumLine'), {
                     type:'line', data:{ labels:cumD.map(d=>d.l), datasets:[
                         { label:'2025累計(推估)', data:cumD.map(d=>Math.round(d.c25/10000)), borderColor:'#64748b', borderWidth:2, tension:.3, fill:false, pointRadius:4 },
-                        { label:'2026累計', data:cumD.map(d=>Math.round(d.c26/10000)), borderColor:'#f59e0b', borderWidth:3, tension:.3, fill:false, pointRadius:4 }
+                        { label:'2026目標累計', data:cumD.map(d=>Math.round(d.cTarget/10000)), borderColor:'#3b82f6', borderWidth:2, borderDash:[6,3], tension:.3, fill:false, pointRadius:4, pointStyle:'rect' },
+                        { label:'2026實際累計', data:cumD.map(d=>Math.round(d.c26/10000)), borderColor:'#f59e0b', borderWidth:3, tension:.3, fill:false, pointRadius:4 }
                     ]}, options:{ responsive:true, maintainAspectRatio:false,
                         plugins:{ legend:{labels:{color:'#cbd5e1'}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toLocaleString()+'萬'}} },
                         scales:{ y:{ticks:{color:'#94a3b8',callback:v=>v.toLocaleString()+'萬'},grid:{color:'#1e293b'}}, x:{ticks:{color:'#94a3b8'},grid:{color:'#1e293b'}} }

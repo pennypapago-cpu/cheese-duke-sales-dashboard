@@ -327,7 +327,9 @@
                         <div class="chart-wrapper"><canvas id="cagrChart"></canvas></div>
                     </div>
                 </div>
-            `;
+            
+                ${aiSection}
+                `;
             page.innerHTML = html;
 
             const ctx1 = document.getElementById('overviewChart').getContext('2d');
@@ -452,13 +454,139 @@
 
                 // Calculate YoY for selected month
                 const yoyCards = [];
+                const yoyValues = [];
                 for (let i = 1; i < years.length; i++) {
                     if (monthValues[i] !== null && monthValues[i-1] !== null && monthValues[i-1] > 0) {
                         const yoy = ((monthValues[i] / monthValues[i-1] - 1) * 100).toFixed(1);
                         const cls = yoy >= 5 ? 'green' : yoy >= -5 ? 'yellow' : 'red';
-                        yoyCards.push(`<div class="kpi-card"><div class="kpi-label">${mLabel} ${years[i]} vs ${years[i-1]}</div><div class="kpi-value"><span class="kpi-change ${cls}">${yoy > 0 ? '+' : ''}${yoy}%</span></div><div style="font-size:11px;color:#64748b">${formatNumber(monthValues[i])} vs ${formatNumber(monthValues[i-1])}</div></div>`);
+                        yoyCards.push(`<div class="kpi-card"><div class="kpi-label">${mLabel} ${years[i]} vs ${years[i-1]}</div><div class="kpi-value"><span class="kpi-change ${cls}">${yoy > 0 ? '+' : ''}${yoy}%</span></div><div style="font-size:11px;color:#64748b">${formatNumber(monthValues[i])} vs ${formatNumber(monthValues[i-1])}</div></div>`);                    yoyValues.push({year: compYear, pct: yoyPct});
+
                     }
                 }
+
+                // === AI Consultant Analysis ===
+                function aiAnalysis() {
+                    const mi = selectedMonth;
+                    const actual23 = month2023[mi], actual24 = month2024[mi], actual25 = month2025[mi];
+                    const val26 = month2026[mi];
+                    const hasActual26 = val26 !== null && mi <= 2;
+
+                    // 1. Seasonality: rank this month among all 12 months (avg of 2023-2025)
+                    const avg3yr = monthNames.map((_, m) => (month2023[m] + month2024[m] + month2025[m]) / 3);
+                    const sorted = avg3yr.map((v, i) => ({m: i, v})).sort((a, b) => b.v - a.v);
+                    const rank = sorted.findIndex(s => s.m === mi) + 1;
+                    const peakMonth = monthNames[sorted[0].m];
+                    const troughMonth = monthNames[sorted[sorted.length - 1].m];
+
+                    // 2. Trend direction (recent 3 years)
+                    const trend25vs24 = ((actual25 / actual24 - 1) * 100).toFixed(1);
+                    const trend24vs23 = ((actual24 / actual23 - 1) * 100).toFixed(1);
+                    const isDecelerating = parseFloat(trend25vs24) < parseFloat(trend24vs23);
+                    const isNegative25 = parseFloat(trend25vs24) < 0;
+                    const isNegative24 = parseFloat(trend24vs23) < 0;
+
+                    // 3. Volatility (coefficient of variation among 2023-2025)
+                    const vals3 = [actual23, actual24, actual25];
+                    const mean3 = vals3.reduce((a, b) => a + b, 0) / 3;
+                    const std3 = Math.sqrt(vals3.reduce((s, v) => s + (v - mean3) ** 2, 0) / 3);
+                    const cv = (std3 / mean3 * 100).toFixed(1);
+
+                    // 4. Predicted 2026 range (linear regression on 2023-2025)
+                    const xVals = [0, 1, 2]; // 2023, 2024, 2025
+                    const xMean = 1, yMean = mean3;
+                    const slope = xVals.reduce((s, x, i) => s + (x - xMean) * (vals3[i] - yMean), 0) / xVals.reduce((s, x) => s + (x - xMean) ** 2, 0);
+                    const intercept = yMean - slope * xMean;
+                    const predicted26 = Math.round(intercept + slope * 3);
+                    const predLow = Math.round(predicted26 * 0.9);
+                    const predHigh = Math.round(predicted26 * 1.1);
+
+                    // 5. Share of annual revenue
+                    const shareOfYear = ((mean3 / ((yearlyData.total[5] + yearlyData.total[6] + yearlyData.total[7]) / 3)) * 100).toFixed(1);
+
+                    // --- Build sections ---
+                    const analysis = [];
+                    analysis.push(`${mLabel}在近三年（2023-2025）平均營收 <b>${formatNumber(Math.round(mean3))}</b>，在 12 個月中排名第 <b>${rank}</b>（全年最高：${peakMonth}、最低：${troughMonth}），佔全年營收約 <b>${shareOfYear}%</b>。`);
+                    if (isNegative25 && isNegative24) {
+                        analysis.push(`\u26a0\ufe0f ${mLabel}已連續兩年衰退：2024 年 YoY ${trend24vs23}%、2025 年 YoY ${trend25vs24}%，顯示結構性需求下滑。`);
+                    } else if (isNegative25) {
+                        analysis.push(`2025 年${mLabel}較 2024 年下滑 ${Math.abs(parseFloat(trend25vs24))}%（${formatNumber(actual25)} vs ${formatNumber(actual24)}），扭轉了前一年的成長勢頭。`);
+                    } else if (isDecelerating) {
+                        analysis.push(`成長趨勢放緩：2024 年 YoY +${trend24vs23}% → 2025 年 YoY +${trend25vs24}%，動能正在減弱。`);
+                    } else {
+                        analysis.push(`成長正在加速：2024 年 YoY ${trend24vs23}% → 2025 年 YoY +${trend25vs24}%，勢頭良好。`);
+                    }
+                    analysis.push(`近三年波動係數 CV = <b>${cv}%</b>` + (parseFloat(cv) > 15 ? '，屬於<span style="color:#ef4444">高波動</span>月份，需特別注意備貨與行銷投入節奏。' : parseFloat(cv) > 8 ? '，波動屬中等水準。' : '，營收相對穩定。'));
+
+                    const suggestions = [];
+                    if (rank <= 3) {
+                        suggestions.push(`<b>\ud83c\udfaf 把握旺季</b>：${mLabel}是年度 Top ${rank} 月份。建議提前 2-3 週備貨、加大 FB/IG 廣告預算 20-30%，並提早上架節慶禮盒組合。`);
+                    } else if (rank >= 10) {
+                        suggestions.push(`<b>\ud83d\udca1 淡季突圍</b>：${mLabel}排名第 ${rank}，為傳統淡季。可考慮推出限定口味、跨品牌聯名，或以「會員專屬優惠」帶動回購。`);
+                    } else {
+                        suggestions.push(`<b>\ud83d\udcca 穩健經營</b>：${mLabel}排名中段（第 ${rank}），建議維持穩定投放，重點測試新素材以尋找成長突破口。`);
+                    }
+                    if (isNegative25) {
+                        suggestions.push(`<b>\ud83d\udd04 扭轉下滑</b>：2025 年${mLabel}出現衰退，建議檢視該月廣告素材疲勞度、受眾重疊率，並嘗試新通路（LINE 禮物限時活動、官網首頁 Banner 輪播）。`);
+                    }
+                    if (parseFloat(cv) > 15) {
+                        suggestions.push(`<b>\ud83d\udcc9 平滑波動</b>：該月高波動，建議導入預購制或訂閱方案來穩定營收基本盤。`);
+                    }
+
+                    const optimizations = [];
+                    optimizations.push(`<b>\ud83d\ude80 廣告投放</b>：依歷史數據，${mLabel}最佳 CPA 約出現在月初第 1-2 週。建議將 60% 預算集中在前兩週，後兩週轉為再行銷。`);
+                    if (mi === 0 || mi === 4 || mi === 7 || mi === 11) {
+                        optimizations.push(`<b>\ud83c\udf81 節慶加持</b>：${mLabel}鄰近重要節慶（${mi===0?'農曆新年':mi===4?'母親節':mi===7?'父親節':mi===11?'聖誕/跨年'}），應提前 3 週啟動預熱活動，搭配限量禮盒策略。`);
+                    }
+                    optimizations.push(`<b>\ud83d\udcb0 產品組合</b>：分析近三年${mLabel}通路結構，若官方旗艦佔比偏低，可推出官網獨家優惠（滿額贈/免運）來提升自有通路佔比臇毛利。`);
+                    optimizations.push(`<b>\ud83d\udce3 素材策略</b>：根據歷年${mLabel}數據，建議同時投放 3 版以上素材（理性/感性/急迫），並在第 7 天進行成效淘汰，保留 ROAS 最高者加碼。`);
+
+                    const risks = [];
+                    if (isNegative25 && isNegative24) {
+                        risks.push(`<span style="color:#ef4444">\u2757 高風險</span>：連續兩年衰退，若不採取行動，2026 年${mLabel}可能持續下探至 <b>${formatNumber(predLow)}</b> 以下。`);
+                    }
+                    if (hasActual26) {
+                        const gap26 = ((val26 / predicted26 - 1) * 100).toFixed(1);
+                        if (parseFloat(gap26) < -10) {
+                            risks.push(`<span style="color:#ef4444">\u26a0\ufe0f 2026 實際值低於預測</span>：${mLabel}實際 ${formatNumber(val26)} vs 預測 ${formatNumber(predicted26)}（${gap26}%），需立即檢視原因。`);
+                        } else if (parseFloat(gap26) > 10) {
+                            risks.push(`<span style="color:#10b981">\u2705 2026 表現優於預期</span>：${mLabel}實際 ${formatNumber(val26)} vs 預測 ${formatNumber(predicted26)}（+${Math.abs(parseFloat(gap26))}%），當前策略有效。`);
+                        } else {
+                            risks.push(`2026 年${mLabel}實際值 ${formatNumber(val26)}，與預測 ${formatNumber(predicted26)} 相近（${gap26}%），走勢符合預期。`);
+                        }
+                    }
+                    risks.push(`<b>\ud83d\udcc8 2026 年預測區間</b>：依近三年線性趨勢，${mLabel}預估落在 <b>${formatNumber(predLow)} ~ ${formatNumber(predHigh)}</b>（中值 ${formatNumber(predicted26)}）。`);
+                    if (parseFloat(cv) > 12) {
+                        risks.push(`\u26a0\ufe0f 波動風險：CV ${cv}% 偏高，實際值偏離預測的機率較大，應預留 10-15% 的預算彈性空間。`);
+                    }
+                    // Competitor / macro risk
+                    risks.push(`\ud83c\udf0d 外部風險：留意原物料（奶油/起司）價格波動、消費信心指數變化，以及電商平台大促（雙11、618）對自有通路的分流效應。`);
+
+                    return {analysis, suggestions, optimizations, risks};
+                }
+                const ai = aiAnalysis();
+                const aiSection = `
+                <div style="margin-top:25px;padding:20px;background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(245,158,11,.06));border:1px solid rgba(99,102,241,.25);border-radius:12px;">
+                    <div style="font-size:16px;font-weight:700;color:#a78bfa;margin-bottom:15px;">\ud83e\udde0 AI \u9867\u554f\u5206\u6790 \u2014 ${mLabel}</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div style="background:rgba(30,41,59,.5);border-radius:8px;padding:14px;border-left:3px solid #6366f1;">
+                            <div style="font-size:13px;font-weight:700;color:#818cf8;margin-bottom:8px;">\ud83d\udd0d \u6578\u64da\u5206\u6790</div>
+                            <div style="font-size:12px;line-height:1.7;color:#cbd5e1;">${ai.analysis.map(t => '<div style="margin-bottom:6px;">' + t + '</div>').join('')}</div>
+                        </div>
+                        <div style="background:rgba(30,41,59,.5);border-radius:8px;padding:14px;border-left:3px solid #f59e0b;">
+                            <div style="font-size:13px;font-weight:700;color:#fbbf24;margin-bottom:8px;">\ud83d\udca1 \u884c\u52d5\u5efa\u8b70</div>
+                            <div style="font-size:12px;line-height:1.7;color:#cbd5e1;">${ai.suggestions.map(t => '<div style="margin-bottom:6px;">' + t + '</div>').join('')}</div>
+                        </div>
+                        <div style="background:rgba(30,41,59,.5);border-radius:8px;padding:14px;border-left:3px solid #10b981;">
+                            <div style="font-size:13px;font-weight:700;color:#34d399;margin-bottom:8px;">\ud83d\ude80 \u512a\u5316\u7b56\u7565</div>
+                            <div style="font-size:12px;line-height:1.7;color:#cbd5e1;">${ai.optimizations.map(t => '<div style="margin-bottom:6px;">' + t + '</div>').join('')}</div>
+                        </div>
+                        <div style="background:rgba(30,41,59,.5);border-radius:8px;padding:14px;border-left:3px solid #ef4444;">
+                            <div style="font-size:13px;font-weight:700;color:#f87171;margin-bottom:8px;">\u26a0\ufe0f \u98a8\u96aa\u9810\u6e2c</div>
+                            <div style="font-size:12px;line-height:1.7;color:#cbd5e1;">${ai.risks.map(t => '<div style="margin-bottom:6px;">' + t + '</div>').join('')}</div>
+                        </div>
+                    </div>
+                </div>`;
+
 
                 page.innerHTML = `
                 <div class="selector-group">

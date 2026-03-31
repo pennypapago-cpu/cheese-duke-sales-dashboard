@@ -181,7 +181,7 @@
         <div class="sidebar-header">起士公爵</div>
         <div class="sidebar-nav">
             <div class="nav-item active" data-page="overview"><span>📊</span> 經營總覽</div>
-            <div class="nav-item" data-page="quarterly"><span>📅</span> 季度趨勢</div>
+            <div class="nav-item" data-page="quarterly"><span>📅</span> 月趨勢</div>
             <div class="nav-item" data-page="monthly"><span>📈</span> 月/週/季比較</div>
             <div class="nav-item" data-page="channels"><span>🏪</span> 通路明細</div>
             <div class="nav-item" data-page="daily"><span>📋</span> 每日蹤跡</div>
@@ -235,6 +235,31 @@
         const total2025 = 63700266;
         const ratio = total2025 / total2024;
         const monthly2025Estimated = month2024.map(m => Math.round(m * ratio));
+
+        // Monthly data for all years (from Google Sheet 銷貨單交易彙總 - 2023-2025年比較)
+        const month2023 = [6084688, 4321731, 4735277, 4499118, 7801003, 4515815, 5880187, 7551892, 5787102, 4394990, 4779328, 5527767];
+        const month2025 = [7077604, 3796953, 3882710, 4888821, 8250747, 3890384, 5085268, 7439667, 5963875, 4217751, 4032427, 5174059];
+        const month2026 = [5710758, 6445841, 2215672, null, null, null, null, null, null, null, null, null];
+
+        // Estimate monthly data for 2018-2022 using average monthly distribution pattern from 2023+2024
+        function estimateMonthly(yearlyTotal, patternArr, patternTotal) {
+            return patternArr.map(m => Math.round(yearlyTotal * m / patternTotal));
+        }
+        const patternAvg = month2023.map((v, i) => (v + month2024[i]) / 2);
+        const patternTotal = patternAvg.reduce((a, b) => a + b, 0);
+        const month2018 = estimateMonthly(yearlyData.total[0], patternAvg, patternTotal);
+        const month2019 = estimateMonthly(yearlyData.total[1], patternAvg, patternTotal);
+        const month2020 = estimateMonthly(yearlyData.total[2], patternAvg, patternTotal);
+        const month2021 = estimateMonthly(yearlyData.total[3], patternAvg, patternTotal);
+        const month2022 = estimateMonthly(yearlyData.total[4], patternAvg, patternTotal);
+
+        // All monthly data indexed by year
+        const allMonthlyData = {
+            2018: month2018, 2019: month2019, 2020: month2020, 2021: month2021, 2022: month2022,
+            2023: month2023, 2024: month2024, 2025: month2025, 2026: month2026
+        };
+
+        
 
         // Number formatting
         function formatNumber(num) {
@@ -386,78 +411,124 @@
             });
         }
 
-        // PAGE 2: QUARTERLY
+        // PAGE 2: MONTHLY TRENDS (formerly QUARTERLY)
         function initQuarterly() {
             const page = document.getElementById('page-quarterly');
-            const html = `
-                <div class="chart-container" style="height: 450px;">
-                    <div class="chart-title">年度營收趨勢 (2018-2026)</div>
-                    <div class="chart-wrapper"><canvas id="quarterlyChart"></canvas></div>
-                </div>
+            const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+            const years = yearlyData.years; // [2018..2026]
+            const chartColors = ['#64748b','#94a3b8','#6366f1','#8b5cf6','#ec4899','#10b981','#3b82f6','#f59e0b','#ef4444'];
 
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>年度</th>
-                                <th class="text-right">全年營收</th>
-                                <th class="text-right">門市合計</th>
-                                <th class="text-right">官方旗艦</th>
-                                <th class="text-right">LINE禮物</th>
-                                <th class="text-right">其他通路</th>
-                                <th class="text-right">電商</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${yearlyData.years.map((y, i) => `
-                                <tr>
-                                    <td>${y}${y === 2026 ? '*' : ''}</td>
-                                    <td class="text-right">${formatNumber(yearlyData.total[i])}</td>
-                                    <td class="text-right">${formatNumber(yearlyData.stores[i])}</td>
-                                    <td class="text-right">${formatNumber(yearlyData.official[i])}</td>
-                                    <td class="text-right">${formatNumber(yearlyData.lineGift[i])}</td>
-                                    <td class="text-right">${formatNumber(yearlyData.otherCh[i])}</td>
-                                    <td class="text-right">${formatNumber(yearlyData.ecom[i])}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                <div style="padding: 0 20px; font-size: 11px; color: #64748b;">* 2026年為1月1日-3月18日累計</div>
-            `;
-            page.innerHTML = html;
+            function renderMonthTrend(selectedMonth) {
+                // selectedMonth: 0-11 (Jan=0, Dec=11)
+                const mLabel = monthNames[selectedMonth];
+                // Gather this month's data across all years
+                const monthValues = years.map(y => {
+                    const d = allMonthlyData[y];
+                    return d ? d[selectedMonth] : null;
+                });
 
-            const ctx = document.getElementById('quarterlyChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: yearlyData.years.map(y => y.toString()),
-                    datasets: [{
-                        label: '全年營收',
-                        data: yearlyData.total.map(v => parseFloat((v / 10000).toFixed(0))),
-                        borderColor: '#f59e0b',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: false,
-                        pointBackgroundColor: '#f59e0b',
-                        pointRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { labels: { color: '#cbd5e1' } }
-                    },
-                    scales: {
-                        y: {
-                            ticks: { color: '#94a3b8', callback: v => v.toLocaleString() + '萬' },
-                            grid: { color: '#1e293b' }
-                        },
-                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                // Build table rows for ALL months (summary view)
+                let tableRows = '';
+                for (let mi = 0; mi < 12; mi++) {
+                    const vals = years.map(y => {
+                        const d = allMonthlyData[y];
+                        return d ? d[mi] : null;
+                    });
+                    const isSelected = mi === selectedMonth;
+                    const bgStyle = isSelected ? 'background:rgba(245,158,11,0.15);' : '';
+                    tableRows += `<tr style="${bgStyle}">
+                        <td style="font-weight:${isSelected?'700':'400'};color:${isSelected?'#f59e0b':'#e2e8f0'}">${monthNames[mi]}</td>
+                        ${vals.map((v, yi) => {
+                            const style = years[yi] === 2026 && mi >= 3 ? 'color:#475569' : (isSelected ? 'color:#f59e0b;font-weight:600' : '');
+                            return `<td class="text-right" style="${style}">${v !== null ? formatNumber(v) : '-'}</td>`;
+                        }).join('')}
+                    </tr>`;
+                }
+                // Yearly total row
+                tableRows += `<tr style="border-top:2px solid #334155;background:rgba(245,158,11,.05)">
+                    <td style="color:#f59e0b;font-weight:700">全年合計</td>
+                    ${years.map((y, yi) => `<td class="text-right" style="color:#f59e0b;font-weight:700">${formatNumber(yearlyData.total[yi])}</td>`).join('')}
+                </tr>`;
+
+                // Calculate YoY for selected month
+                const yoyCards = [];
+                for (let i = 1; i < years.length; i++) {
+                    if (monthValues[i] !== null && monthValues[i-1] !== null && monthValues[i-1] > 0) {
+                        const yoy = ((monthValues[i] / monthValues[i-1] - 1) * 100).toFixed(1);
+                        const cls = yoy >= 5 ? 'green' : yoy >= -5 ? 'yellow' : 'red';
+                        yoyCards.push(`<div class="kpi-card"><div class="kpi-label">${mLabel} ${years[i]} vs ${years[i-1]}</div><div class="kpi-value"><span class="kpi-change ${cls}">${yoy > 0 ? '+' : ''}${yoy}%</span></div><div style="font-size:11px;color:#64748b">${formatNumber(monthValues[i])} vs ${formatNumber(monthValues[i-1])}</div></div>`);
                     }
                 }
-            });
+
+                page.innerHTML = `
+                <div class="selector-group">
+                    <span class="selector-label">選擇月份：</span>
+                    ${monthNames.map((m, i) => `<button class="period-btn ${selectedMonth===i?'active':''}" onclick="window._setMonthTrend(${i})">${m}</button>`).join('')}
+                </div>
+                <div class="alert">2018-2022年月度為依2023-2024年月度比例推估值。2026年僅有1-3月實際數據（截至3月18日）。2023-2025年月度數據來自銷貨單交易彙總。</div>
+
+                <div class="chart-container" style="height: 450px;">
+                    <div class="chart-title">${mLabel}趨勢 (2018-2026)</div>
+                    <div class="chart-wrapper"><canvas id="monthTrendChart"></canvas></div>
+                </div>
+
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:15px 0 10px">${mLabel} 歷年 YoY 變化</div>
+                <div class="kpi-grid">${yoyCards.join('')}</div>
+
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">各月 × 各年度營收明細</div>
+                <div class="table-container" style="overflow-x:auto">
+                    <table>
+                        <thead><tr><th>月份</th>${years.map(y => `<th class="text-right">${y}${y===2026?'*':''}</th>`).join('')}</tr></thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                </div>
+                <div style="padding: 0 20px; font-size: 11px; color: #64748b;">* 2026年僅1-3月為實際數據（截至3月18日）。2018-2022年月度為推估值。</div>
+                `;
+
+                // Chart: selected month trend across years
+                const validData = monthValues.map(v => v !== null ? Math.round(v / 10000) : null);
+                const ctx = document.getElementById('monthTrendChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: years.map(y => y.toString()),
+                        datasets: [{
+                            label: mLabel + ' 營收',
+                            data: validData,
+                            backgroundColor: years.map((y, i) => {
+                                if (y === 2026 && selectedMonth >= 3) return 'rgba(100,116,139,0.3)';
+                                if (y <= 2022) return 'rgba(148,163,184,0.5)';
+                                return 'rgba(245,158,11,0.7)';
+                            }),
+                            borderColor: years.map((y, i) => {
+                                if (y === 2026 && selectedMonth >= 3) return '#475569';
+                                if (y <= 2022) return '#94a3b8';
+                                return '#f59e0b';
+                            }),
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { labels: { color: '#cbd5e1' } },
+                            tooltip: { callbacks: { label: c => c.dataset.label + ': ' + (c.raw ? c.raw.toLocaleString() + '萬' : '-') } }
+                        },
+                        scales: {
+                            y: {
+                                ticks: { color: '#94a3b8', callback: v => v.toLocaleString() + '萬' },
+                                grid: { color: '#1e293b' }
+                            },
+                            x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                        }
+                    }
+                });
+            }
+
+            window._setMonthTrend = renderMonthTrend;
+            renderMonthTrend(0); // Default to January
         }
 
         // PAGE 3: MONTHLY

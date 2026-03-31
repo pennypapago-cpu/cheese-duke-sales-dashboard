@@ -476,6 +476,10 @@
                 <div class="kpi-grid">${yoyCards.join('')}</div>
 
                 <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">各月 × 各年度營收明細</div>
+                <div class="chart-container" style="height: 400px;">
+                    <div class="chart-title">各年度月營收走勢 (1月-12月)</div>
+                    <div class="chart-wrapper"><canvas id="monthAllYearsLineChart"></canvas></div>
+                </div>
                 <div class="table-container" style="overflow-x:auto">
                     <table>
                         <thead><tr><th>月份</th>${years.map(y => `<th class="text-right">${y}${y===2026?'*':''}</th>`).join('')}</tr></thead>
@@ -526,6 +530,62 @@
                     }
                 });
             }
+
+                // Line chart: all years monthly revenue trend
+                const lineColors = ['#64748b','#94a3b8','#6366f1','#8b5cf6','#ec4899','#10b981','#3b82f6','#f59e0b','#ef4444'];
+                const lineCtx = document.getElementById('monthAllYearsLineChart').getContext('2d');
+                const lineDatasets = years.map((y, yi) => {
+                    const data = allMonthlyData[y] ? allMonthlyData[y].map(v => v !== null ? Math.round(v / 10000) : null) : new Array(12).fill(null);
+                    const isHighlight = y >= 2023;
+                    return {
+                        label: y.toString(),
+                        data: data,
+                        borderColor: lineColors[yi],
+                        backgroundColor: lineColors[yi],
+                        borderWidth: isHighlight ? 2.5 : 1.2,
+                        borderDash: y <= 2022 ? [4, 3] : [],
+                        tension: 0.3,
+                        pointRadius: isHighlight ? 3 : 1.5,
+                        pointHoverRadius: 5,
+                        fill: false,
+                        hidden: y <= 2021
+                    };
+                });
+                new Chart(lineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: monthNames,
+                        datasets: lineDatasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#cbd5e1', usePointStyle: true, pointStyle: 'line', padding: 12, font: { size: 11 } },
+                                onClick: function(e, legendItem, legend) {
+                                    const idx = legendItem.datasetIndex;
+                                    const ci = legend.chart;
+                                    ci.getDatasetMeta(idx).hidden = !ci.getDatasetMeta(idx).hidden;
+                                    ci.update();
+                                }
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: { label: c => c.dataset.label + ': ' + (c.raw ? c.raw.toLocaleString() + '萬' : '-') }
+                            }
+                        },
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            y: {
+                                ticks: { color: '#94a3b8', callback: v => v.toLocaleString() + '萬' },
+                                grid: { color: '#1e293b' }
+                            },
+                            x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                        }
+                    }
+                });
 
             window._setMonthTrend = renderMonthTrend;
             renderMonthTrend(0); // Default to January

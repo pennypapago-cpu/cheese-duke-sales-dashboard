@@ -328,7 +328,6 @@
                     </div>
                 </div>
             
-                ${aiSection}
                 `;
             page.innerHTML = html;
 
@@ -459,8 +458,7 @@
                     if (monthValues[i] !== null && monthValues[i-1] !== null && monthValues[i-1] > 0) {
                         const yoy = ((monthValues[i] / monthValues[i-1] - 1) * 100).toFixed(1);
                         const cls = yoy >= 5 ? 'green' : yoy >= -5 ? 'yellow' : 'red';
-                        yoyCards.push(`<div class="kpi-card"><div class="kpi-label">${mLabel} ${years[i]} vs ${years[i-1]}</div><div class="kpi-value"><span class="kpi-change ${cls}">${yoy > 0 ? '+' : ''}${yoy}%</span></div><div style="font-size:11px;color:#64748b">${formatNumber(monthValues[i])} vs ${formatNumber(monthValues[i-1])}</div></div>`);                    yoyValues.push({year: compYear, pct: yoyPct});
-
+                        yoyCards.push(`<div class="kpi-card"><div class="kpi-label">${mLabel} ${years[i]} vs ${years[i-1]}</div><div class="kpi-value"><span class="kpi-change ${cls}">${yoy > 0 ? '+' : ''}${yoy}%</span></div><div style="font-size:11px;color:#64748b">${formatNumber(monthValues[i])} vs ${formatNumber(monthValues[i-1])}</div></div>`);
                     }
                 }
 
@@ -615,6 +613,7 @@
                     </table>
                 </div>
                 <div style="padding: 0 20px; font-size: 11px; color: #64748b;">* 2026年僅1-3月為實際數據（截至3月18日）。2018-2022年月度為推估值。</div>
+                ${aiSection}
                 `;
 
                 // Chart: selected month trend across years

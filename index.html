@@ -837,10 +837,16 @@
                 q1T.official += mTarget[i].official; q1T.channels += mTarget[i].channels;
             });
 
-            // Yearly comparison
+            // H1 comparison vs last year same period (2025 H1 from ch25m)
+            const h1_25 = {
+                stores: ch25m.stores.reduce((a,b)=>a+b,0),
+                official: ch25m.official.reduce((a,b)=>a+b,0),
+                lineGift: ch25m.lineGift.reduce((a,b)=>a+b,0),
+                otherCh: ch25m.otherCh.reduce((a,b)=>a+b,0)
+            };
             const yrChannels = channels.map(ch => ({
                 name: ch.name, color: ch.color,
-                y26: yearlyData[ch.k][8], y25: yearlyData[ch.k][7], y24: yearlyData[ch.k][6]
+                y26: q1A[ch.k], y25: h1_25[ch.k]
             }));
 
             // Monthly cross table with targets
@@ -899,14 +905,14 @@
                     <tbody>${crossRows}</tbody></table>
                 </div>
 
-                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">年度通路比較 (2026 H1 vs 2025 vs 2024)</div>
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin:20px 0 10px">通路比較 (2026 上半年 vs 2025 上半年)</div>
                 <div class="table-container">
-                    <table><thead><tr><th>通路</th><th class="text-right">2024全年</th><th class="text-right">2025全年</th><th class="text-right">25 vs 24</th><th class="text-right">2026 H1</th><th class="text-right">2025佔比</th></tr></thead>
+                    <table><thead><tr><th>通路</th><th class="text-right">2025 上半年</th><th class="text-right">2026 上半年</th><th class="text-right">YoY</th><th class="text-right">差額</th><th class="text-right">2026佔比</th></tr></thead>
                     <tbody>${yrChannels.map(ch => {
-                        const y = ((ch.y25/ch.y24-1)*100).toFixed(1);
+                        const y = ((ch.y26/ch.y25-1)*100).toFixed(1);
                         const c = y >= 5 ? 'green' : y >= -5 ? 'yellow' : 'red';
-                        const share = (ch.y25/yearlyData.total[7]*100).toFixed(1);
-                        return `<tr><td style="color:${ch.color};font-weight:600">${ch.name}</td><td class="text-right">${formatNumber(ch.y24)}</td><td class="text-right">${formatNumber(ch.y25)}</td><td class="text-right"><span class="kpi-change ${c}">${y>0?'+':''}${y}%</span></td><td class="text-right">${formatNumber(ch.y26)}</td><td class="text-right">${share}%</td></tr>`;
+                        const share = (ch.y26/q1A.total*100).toFixed(1);
+                        return `<tr><td style="color:${ch.color};font-weight:600">${ch.name}</td><td class="text-right" style="color:#64748b">${formatNumber(ch.y25)}</td><td class="text-right">${formatNumber(ch.y26)}</td><td class="text-right"><span class="kpi-change ${c}">${y>0?'+':''}${y}%</span></td><td class="text-right" style="color:${ch.y26>=ch.y25?'#10b981':'#ef4444'}">${(ch.y26-ch.y25).toLocaleString()}</td><td class="text-right">${share}%</td></tr>`;
                     }).join('')}</tbody></table>
                 </div>
 

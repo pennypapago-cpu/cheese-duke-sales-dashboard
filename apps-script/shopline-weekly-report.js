@@ -46,8 +46,13 @@ var COLUMN_SPEC = {
   utmCampaign: { names: ['UTM活動名稱', 'UTM 活動名稱'], index: 70 },
   sku:         { names: ['商品貨號(SKU)', '商品貨號', 'SKU'], index: 74 },
   productName: { names: ['商品名稱'], index: 75 },
-  itemTotal:   { names: ['商品合計'], index: 79 },
-  quantity:    { names: ['數量'], index: 82 }
+  /**
+   * 實際的「官網訂單」沒有整行金額欄位，只有單價（商品結帳價）。
+   * 因此商品金額一律用「單價 x 數量」計算；只有在表上真的存在整行金額欄時才直接採用。
+   */
+  itemLineTotal: { names: ['商品合計'], optional: true },
+  itemUnitPrice: { names: ['商品結帳價', '商品單價'], index: 79 },
+  quantity:      { names: ['數量'], index: 82 }
 };
 
 var REPORT_WIDTH = 8;
@@ -142,7 +147,13 @@ function resolveColumns(headerRow) {
         if (normalized[i] === want) { found = i; break; }
       }
     }
-    cols[key] = found >= 0 ? found : spec.index;
+    if (found >= 0) {
+      cols[key] = found;
+    } else if (spec.optional) {
+      cols[key] = -1;
+    } else {
+      cols[key] = spec.index;
+    }
   }
   return cols;
 }
@@ -207,7 +218,7 @@ function buildOrders(values, cols) {
 
     if (sku || productName) {
       var qty = toNumber(row[cols.quantity]);
-      var amount = toNumber(row[cols.itemTotal]);
+      var amount = itemAmount(row, cols, qty);
       order.units += qty;
       order.itemAmount += amount;
       order.items.push({ sku: sku, name: productName, qty: qty, amount: amount });
@@ -215,6 +226,18 @@ function buildOrders(values, cols) {
   }
 
   return list;
+}
+
+/**
+ * 單一商品列的金額。
+ * 有整行金額欄（商品合計）就直接用；否則用「商品結帳價 x 數量」。
+ * 結帳價已是折後價（見結帳價類型欄），不再另外扣商品折扣金額。
+ */
+function itemAmount(row, cols, qty) {
+  if (cols.itemLineTotal >= 0 && cellText(row, cols.itemLineTotal) !== '') {
+    return toNumber(row[cols.itemLineTotal]);
+  }
+  return toNumber(row[cols.itemUnitPrice]) * qty;
 }
 
 function summarize(orders, start, end) {
